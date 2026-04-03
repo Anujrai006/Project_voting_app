@@ -97,3 +97,115 @@ async function dbLoadVoters() {
   rows.forEach(r => { out[r.id] = r; delete out[r.id].id; });
   return out;
 }
+async function dbLoadVoters() {
+  const rows = await dbGetAll(STORES.VOTERS);
+  const out = {};
+  rows.forEach(r => { out[r.id] = r; delete out[r.id].id; });
+  return out;
+}
+async function dbSaveVoter(id, data) {
+  await dbPut(STORES.VOTERS, { id, ...data });
+}
+async function dbDeleteVoter(id) {
+  await dbDelete(STORES.VOTERS, id);
+}
+
+// FPTP votes
+async function dbLoadFptp() {
+  const rows = await dbGetAll(STORES.FPTP);
+  const out = {};
+  rows.forEach(r => { out[r.constituency] = r.votes; });
+  return out;
+}
+async function dbSaveFptpConstituency(constituency, votes) {
+  await dbPut(STORES.FPTP, { constituency, votes });
+}
+
+// PR votes
+async function dbLoadPr() {
+  const rows = await dbGetAll(STORES.PR);
+  const out = { RSP: 0, NC: 0, CPN: 0 };
+  rows.forEach(r => { out[r.party] = r.count; });
+  return out;
+}
+async function dbSavePrParty(party, count) {
+  await dbPut(STORES.PR, { party, count });
+}
+
+// Meta
+async function dbGetMeta(key, fallback) {
+  const row = await dbGet(STORES.META, key);
+  return row ? row.value : fallback;
+}
+async function dbSetMeta(key, value) {
+  await dbPut(STORES.META, { key, value });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CONFIGURATION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const PARTIES = {
+  RSP: { name: "Rastriya Swatantra Party", short: "RSP", color: "#185FA5", bg: "#E6F1FB", text: "#0C447C" },
+  NC:  { name: "Nepali Congress",           short: "NC",  color: "#A32D2D", bg: "#FCEBEB", text: "#791F1F" },
+  CPN: { name: "CPN-UML",                   short: "CPN", color: "#3B6D11", bg: "#EAF3DE", text: "#27500A" },
+};
+
+const CONSTITUENCIES = [
+  "Kathmandu-1", "Kathmandu-2", "Kathmandu-3",
+  "Lalitpur-1",  "Bhaktapur-1",
+  "Chitwan-1",   "Chitwan-2",
+  "Pokhara-1",   "Pokhara-2",
+  "Butwal-1",    "Dharan-1",    "Biratnagar-1"
+];
+
+const ADMIN_PASSWORD = "admin123";
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// REUSABLE UI COMPONENTS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function Card({ children, style = {} }) {
+  return React.createElement("div", {
+    style: { background: "#fff", border: "1px solid #e5e5e5", borderRadius: 12, padding: "1rem 1.25rem", ...style }
+  }, children);
+}
+
+function MetricCard({ label, value, color }) {
+  return React.createElement("div", {
+    style: { background: "#f9f9f9", borderRadius: 8, padding: "0.75rem 1rem", textAlign: "center" }
+  },
+    React.createElement("div", { style: { fontSize: 11, color: "#888", marginBottom: 4 } }, label),
+    React.createElement("div", { style: { fontSize: 20, fontWeight: 600, color: color || "#111" } }, value)
+  );
+}
+
+function Badge({ color, bg, text, children }) {
+  return React.createElement("span", {
+    style: { background: bg, color: text, border: `1px solid ${color}40`, borderRadius: 6, padding: "3px 10px", fontSize: 12, fontWeight: 500 }
+  }, children);
+}
+
+function PartyBar({ party, votes, total }) {
+  const pct = total > 0 ? Math.round((votes / total) * 100) : 0;
+  const p = PARTIES[party];
+  return React.createElement("div", { style: { marginBottom: 10 } },
+    React.createElement("div", { style: { display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 4 } },
+      React.createElement("span", { style: { fontWeight: 500 } }, p.short),
+      React.createElement("span", { style: { color: "#888" } }, `${votes} votes (${pct}%)`)
+    ),
+    React.createElement("div", { style: { background: "#f0f0f0", borderRadius: 4, height: 8, overflow: "hidden" } },
+      React.createElement("div", { style: { width: pct + "%", background: p.color, height: "100%", borderRadius: 4, transition: "width 0.5s" } })
+    )
+  );
+}
+
+function Alert({ message, type }) {
+  if (!message) return null;
+  const c = { error: { bg:"#FCEBEB",color:"#791F1F",border:"#F7C1C1" }, success: { bg:"#EAF3DE",color:"#27500A",border:"#C0DD97" }, info: { bg:"#E6F1FB",color:"#0C447C",border:"#B5D4F4" } }[type] || {};
+  return React.createElement("div", { style: { margin: "0.5rem 0", padding: "10px 14px", borderRadius: 8, fontSize: 13, background: c.bg, color: c.color, border: `1px solid ${c.border}` } }, message);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// EYE / IRIS SCANNER (animated canvas)
+// ═══════════════════════════════════════════════════════════════════════════════
